@@ -1,4 +1,4 @@
-package com.jie.dao;
+package com.jie.imports;
 
 public class TestImportDao {
 
