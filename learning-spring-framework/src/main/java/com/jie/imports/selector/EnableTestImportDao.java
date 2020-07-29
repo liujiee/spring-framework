@@ -1,7 +1,6 @@
-package com.jie.imports.anno;
+package com.jie.imports.selector;
 
 
-import com.jie.imports.TestImportDaoImportSelector;
 import org.springframework.context.annotation.Import;
 
 import java.lang.annotation.Retention;

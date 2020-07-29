@@ -126,7 +126,14 @@ abstract class ConfigurationClassUtils {
 		if (config != null && !Boolean.FALSE.equals(config.get("proxyBeanMethods"))) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_FULL);
 		}
-		// 找不到 @Configuration 注解的配置类的话就会在 BeanDefinition 中标记为 lite
+		/**
+		 *  isConfigurationCandidate(metadata)
+		 *  1. 首先判断如果 metadata 是接口的話 return false
+		 *  2. 其次如果 metadata 中有 {Import, Component, ImportResource, ComponentScan} 中的任何一个 return true
+		 *  3. 最后 metadata 中有被 @Bean 修饰的方法， 则return true
+		 *
+		 *  此处只是給 db 中打一个 lite configuration 中的标志，没有任何实际意义
+		 */
 		else if (config != null || isConfigurationCandidate(metadata)) {
 			beanDef.setAttribute(CONFIGURATION_CLASS_ATTRIBUTE, CONFIGURATION_CLASS_LITE);
 		}

@@ -25,6 +25,9 @@ buildSrc/build
 /framework-bom/build
 /integration-tests/build
 /src/asciidoc/build
+
+/learning-spring-*/build
+
 target/
 
 # Eclipse artifacts, including WTP generated manifests

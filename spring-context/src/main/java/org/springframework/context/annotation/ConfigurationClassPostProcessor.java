@@ -260,7 +260,12 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 					logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
 				}
 			}
-			// 确定 Configuration class 的候选人，會給 beanDef 添加 full or lite 标记。以便后续操作
+			/**
+			 *  checkConfigurationClassCandidate
+			 *  beanDef 有 @Configuration 则标识为 full configuration, return true
+			 *  beanDef 有 {Import, Component, ImportResource, ComponentScan} 任何一个注解，或者是被 @Bean 修饰的方法，
+			 *  则标记为 lite configuration 返回 true
+			 */
 			else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
 				configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
 			}
@@ -278,7 +283,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			return Integer.compare(i1, i2);
 		});
 
-		// 客制化 beanName 的生成策略
+		// 客制化 beanName 的生成策略, 默认使用首字母小写驼峰策略
 		// Detect any custom bean name generation strategy supplied through the enclosing application context
 		SingletonBeanRegistry sbr = null;
 		if (registry instanceof SingletonBeanRegistry) {
@@ -305,6 +310,15 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		Set<BeanDefinitionHolder> candidates = new LinkedHashSet<>(configCandidates);
 		Set<ConfigurationClass> alreadyParsed = new HashSet<>(configCandidates.size());
 		do {
+			/**
+			 * 解析配置类，在此处会解析配置类上的注解(ComponentScan扫描出的类，@Import注册的类，以及@Bean方法定义的类)
+			 * Import(ImportSelector, ImportBeanDefinitionRegistrar, DeferredImportSelector, resources)
+			 * 通过其他注解(例如@Import、@Bean)的方式，在parse()方法这一步并不会将其解析为BeanDefinition放入到BeanDefinitionMap中，
+			 * 而是先解析成ConfigurationClass类
+			 *
+			 * 真正放入到map中是在下面的this.reader.loadBeanDefinitions()方法中实现的
+			 */
+
 			parser.parse(candidates);
 			parser.validate();
 
@@ -318,10 +332,35 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
+
+			/**
+			 * 将上一步parser解析出的ConfigurationClass类加载成BeanDefinition
+			 * 实际上经过上一步的parse()后，解析出来的bean已经放入到BeanDefinition中了，
+			 * 但是由于这些bean可能会引入新的bean，例如实现了ImportBeanDefinitionRegistrar或者ImportSelector接口的bean，
+			 * 或者bean中存在被@Bean注解的方法
+			 *
+			 * 因此需要执行一次loadBeanDefinition()，这样就会执行ImportBeanDefinitionRegistrar
+			 * 或者ImportSelector接口的方法或者@Bean注释的方法
+			 *
+			 */
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);
 
 			candidates.clear();
+
+			/**
+			 *  后续的代码在处理 配置类中 Import 了另外一个被 Import 注解的配置类
+			 *  registry.getBeanDefinitionCount() = beaFactory.getDeanDefinitionMap.size()
+			 *
+			 * 这里判断registry.getBeanDefinitionCount() > candidateNames.length的
+			 *  目的是为了知道reader.loadBeanDefinitions(configClasses)这一步有没有向BeanDefinitionMap中添加新的BeanDefinition
+			 * 实际上就是看配置类(例如AppConfig类会向BeanDefinitionMap中添加bean)
+			 * 如果有，registry.getBeanDefinitionCount()就会大于candidateNames.length
+			 * 这样就需要再次遍历新加入的BeanDefinition，并判断这些bean是否已经被解析过了，如果未解析，需要重新进行解析
+			 * 这里的AppConfig类向容器中添加的bean，实际上在parser.parse()这一步已经全部被解析了
+			 * 所以为什么还需要做这个判断，目前没看懂，似乎没有任何意义。
+			 *
+			 */
 			if (registry.getBeanDefinitionCount() > candidateNames.length) {
 				String[] newCandidateNames = registry.getBeanDefinitionNames();
 				Set<String> oldCandidateNames = new HashSet<>(Arrays.asList(candidateNames));
@@ -329,6 +368,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 				for (ConfigurationClass configurationClass : alreadyParsed) {
 					alreadyParsedClasses.add(configurationClass.getMetadata().getClassName());
 				}
+				// 如果有未解析的类，则将其添加到candidates中，这样candidates不为空，就会进入到下一次的while的循环中
 				for (String candidateName : newCandidateNames) {
 					if (!oldCandidateNames.contains(candidateName)) {
 						BeanDefinition bd = registry.getBeanDefinition(candidateName);
