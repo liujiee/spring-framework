@@ -1,3 +1,4 @@
+/*
 package com.jie;
 
 import com.jie.config.AppConfig;
@@ -23,3 +24,4 @@ public class MyWebAppInitializer extends AbstractAnnotationConfigDispatcherServl
 		};
 	}
 }
+*/
