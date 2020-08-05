@@ -55,13 +55,19 @@ final class PostProcessorRegistrationDelegate {
 			List<BeanFactoryPostProcessor> regularPostProcessors = new ArrayList<>();
 			List<BeanDefinitionRegistryPostProcessor> registryProcessors = new ArrayList<>();
 
-			// 最先处理开发人员手动添加到 context 中的 BeanFactoryPostProcessor
+			/**
+			 * beanFactoryPostProcessors = getBeanFactoryPostProcessors() 是通过调用
+			 * 		context.addBeanFactoryPostProcessor(processor) 添加的 beanFactoryPostProcessor
+			 *
+			 * 	最先处理开发人员手动添加到 context 中的 BeanFactoryPostProcessor
+			 */
 			for (BeanFactoryPostProcessor postProcessor : beanFactoryPostProcessors) {
 				if (postProcessor instanceof BeanDefinitionRegistryPostProcessor) {
-
-					// 如果发现开发人员添加的 BeanFactoryPostProcessor 是 BeanDefinitionRegistryPostProcess
-					// 则直接调用接口的方法进行处理
-
+					/**
+					 * 如果发现开发人员添加的 BeanFactoryPostProcessor 是 BeanDefinitionRegistryPostProcess
+					 * 则首先囘调 BeanDefinitionRegistryPostProcess#postProcessorBeanDefinitionRegistry(registry)
+					 * 并且將其添加到 registryProcessors List 中，稍后统一囘调父接口 BeanFactoryPostProcessor#postProcessBeanFactory(registry)
+					 */
 					BeanDefinitionRegistryPostProcessor registryProcessor =
 							(BeanDefinitionRegistryPostProcessor) postProcessor;
 					registryProcessor.postProcessBeanDefinitionRegistry(registry);
@@ -69,8 +75,12 @@ final class PostProcessorRegistrationDelegate {
 				}
 				else {
 
-					// 如果开发人员添加的添加的 BeanFactoryPostProcessor 只是一个普通的 BeanFactoryPostProcessor 的话
-					// 就先添加到 regularPostProcessor 中之后才一并处理
+					//
+					// 则直接添加到 regularPostProcessor List中之后才一并处理
+					/**
+					 * 如果开发人员添加的添加的 BeanFactoryPostProcessor 直接实现 BeanFactoryPostProcessor 的话
+					 * 直接添加到 regularPostProcessors List 中，之后统一囘调 BeanFactoryPostProcessor#postProcessBeanFacotry(beanFactory)
+					 */
 					regularPostProcessors.add(postProcessor);
 				}
 			}
@@ -79,26 +89,24 @@ final class PostProcessorRegistrationDelegate {
 			// uninitialized to let the bean factory post-processors apply to them!
 			// Separate between BeanDefinitionRegistryPostProcessors that implement
 			// PriorityOrdered, Ordered, and the rest.
-			/**
-			 * 此处不初始化 Factory, 保留所有常规的 BeanFactoryPostProcessor 最后处理，就能作用在所有的BeanDefinition上
-			 * 將 DeanDefinitionRegistryPostProcessor 分类三类进行处理
-			 * 1. 实现 PriorityOrdered（父接口是 Ordered） 接口的
-			 * 2. 实现 Ordered 接口的
-			 * 3. 剩下其他的
-			 */
+
 			List<BeanDefinitionRegistryPostProcessor> currentRegistryProcessors = new ArrayList<>();
 
 			/**
-			 * 截至 currentRegistryProcessors.clear(); 这一行代码
+			 * 后面的代码將囘调注册在容器中的 BeanDefinitionRegistry#postProcessBeanDefinitionRegistry(registry)
 			 *
-			 * 分别针对三类 DeanDefinitionRegistryPostProcessor， 以实现 PriorityOrdered 接口的为例
-			 *
-			 * 1. 从 bean 工厂获取到该类别的所有 class
-			 * 2. 循环对每一个类型校验（是否实现 PriorityOrdered）
-			 * 3. 循环重 bean 工厂中获取到对象，并添加的 currentRegistryProcessor中，同时添加到已经处理过的 processedBeans 中
-			 * 4. 循环结束之后对 currentRegistryProcessors 进行排序
-			 * 5. 將 currentRegistryProcessors 全部添加到 registryProcessors（记录所有已经处理过的 BeanDefinitionRegistryPostProcessor） 中去
-			 * 6. 调用 invokeBeanDefinitionRegistryPostProcessors 进行处理（实际上就是循环调用接口中定义的 postProcessBeanRegistry(registry))
+			 * 对 BeanDefinitionRegistry分类处理
+			 * 		首先处理是 PriorityOrdered 的 BeanDefinitionRegistry
+			 * 		其次处理是 Ordered 的 BeanDefinitionRegistry
+			 * 	    最后处理普通的 BeanDefinitionRegistry
+			 *---------------------------------------------------------------------------------------------------
+			 * 细节如下： 以是 PriorityOrdered 的 BeanDefinitionRegistry 为例
+			 * 1. 从 bean 工厂获取到该类别的所有 BeanDefinitionRegistry 的名字
+			 * 2. 循环对每一个类型校验, 对 PriorityOrdered 的BeanDefinitionRegistry进行步骤3
+			 * 3. 循环中將满足要求的 PriorityOrdered#BeanDefinitionRegistry 添加到 currentRegistryProcessors，将该beanName添加到processedBeans中
+			 * 4. currentRegistryProcessors 进行排序
+			 * 5. PriorityOrdered#BeanDefinitionRegistry的 bean 添加到registryProcessors中
+			 * 6. 对 currentRegistryProcessors 回调 BeanDefinitionRegistry#postProcessBeanDefinitionRegistry(registry)
 			 * 7. 清空 currentRegistryProcessors（下一个类别以同样的流程进行处理）
 			 *
 			 */
@@ -153,6 +161,11 @@ final class PostProcessorRegistrationDelegate {
 			 *  他们还有另外一层身份，作为 普通的 BeanFactoryPostProcessor，执行自己的任务。
 			 *  先 spring 自己内部管理的 BeanFactoryPostProcessor 执行
 			 *  然后才是 开发人员添加进去的 BeanFactoryPostProcessor 执行
+			 *
+			 *  代码执行到此处，所有 BeanDefinitionRegistry#postProcessBeanDefinitionRegistry(registry)囘调已经结束
+			 *
+			 *  接下来执行 BeanDefinitionRegistry另外一个身份（BeanFactoryPostProcessor#postProcessBeanFacotry(beanFactory)
+			 *  和普通 BeanFactoryPostProcessor#postProcessBeanFactory(beanFactory)回调
 			 */
 
 			// Now, invoke the postProcessBeanFactory callback of all processors handled so far.
@@ -161,7 +174,8 @@ final class PostProcessorRegistrationDelegate {
 		}
 
 		else {
-			// else 处理的是单身份 BeanFactoryPostProcessor
+			// 分支条件是 beanFactory 只是普通的 beanFactory 不是 registry的话，
+			// 直接囘调 beanFactoryPostProcessor#postProcessBeanFactory(beanFactory)
 			// Invoke factory processors registered with the context instance.
 			invokeBeanFactoryPostProcessors(beanFactoryPostProcessors, beanFactory);
 		}

@@ -502,6 +502,16 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			 * 3. 給单例缓冲池 SingletonObjects 放了三个和环境变量相关的对象
 			 */
 			// Prepare the bean factory for use in this context.
+
+			/**
+			 * 1. 增加了对 SpEL 语言的支持
+			 * 2. 增加对属性编辑器的支持
+			 * 3. 增加了一些内置类，比如 EnvironmentAware、MessageSourceAware
+			 * 4. 设置了依赖功能可忽略的接口
+			 * 5. 注册了一些固定依赖的属性
+			 * 6. 增加 AspectJ 的支持
+			 * 7. 將相关环境变量以及属性以单例模式进行注册
+			 */
 			prepareBeanFactory(beanFactory);
 
 			try {
@@ -525,6 +535,9 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				// Invoke factory processors registered as beans in the context.
 				invokeBeanFactoryPostProcessors(beanFactory);
 
+				/**
+				 * 注册 BeanPostProcessor, 仅仅是注册，稍后会在 bean实例化前后分别囘调9次（5类）BeanPostProcessor
+				 */
 				// Register bean processors that intercept bean creation.
 				registerBeanPostProcessors(beanFactory);
 
@@ -540,6 +553,9 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				// Check for listener beans and register them.
 				registerListeners();
 
+				/**
+				 * 主要包含 ConversionService的设置、配置以及非延迟加载bean的初始化工作等
+				 */
 				// Instantiate all remaining (non-lazy-init) singletons.
 				finishBeanFactoryInitialization(beanFactory);
 
@@ -871,9 +887,15 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		// Stop using the temporary ClassLoader for type matching.
 		beanFactory.setTempClassLoader(null);
 
+		/**
+		 * 冻结所有的bean定义，说明注册的bean定义將不被修改或者进行任何进一步的处理
+		 */
 		// Allow for caching all bean definition metadata, not expecting further changes.
 		beanFactory.freezeConfiguration();
 
+		/**
+		 * 初始化非延迟加载
+		 */
 		// Instantiate all remaining (non-lazy-init) singletons.
 		beanFactory.preInstantiateSingletons();
 	}
