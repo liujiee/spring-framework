@@ -8,18 +8,16 @@ public class Application {
 
 		Tomcat tomcat = new Tomcat();
 		tomcat.setPort(8080);
-		tomcat.addContext("/", "d:\\test_tomcat\\");
-	/*	AnnotationConfigWebApplicationContext ac = new AnnotationConfigWebApplicationContext();
+		tomcat.addWebapp("/app", "E:\\opensource\\spring-framework\\learning-spring-webmvc\\src\\main");
+/*		AnnotationConfigWebApplicationContext ac = new AnnotationConfigWebApplicationContext();
 		ac.register(AppConfig.class);
-
-
+		//ac.refresh();
 
 		// Create and register the DispatcherServlet
 		DispatcherServlet servlet = new DispatcherServlet(ac);
-		Wrapper mvc = tomcat.addServlet("/", "dispatcherServlet", servlet);
-
-		mvc.setLoadOnStartup(1);
-		mvc.addMapping("/");*/
+		ServletRegistration.Dynamic registration = tomcat.addServlet("app", servlet);
+		registration.setLoadOnStartup(1);
+		registration.addMapping("/");*/
 
 		try {
 			tomcat.start();

@@ -1,7 +1,20 @@
 plugins {
     id 'java'
     id 'war'
+    id 'com.github.sahara3.tomcat-runner' version '0.2.1'
 }
+
+tomcat {
+    version = 9.0
+    port = 8080
+
+    webapp(project(':learning-spring-webmvc')) {
+        contextPath = '/' // root context.
+    }
+
+
+}
+
 
 group 'org.springframework'
 version '5.2.8.BUILD-SNAPSHOT'
@@ -14,6 +27,8 @@ dependencies {
     compile(project(":spring-webmvc"))
 
     compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: '9.0.37'
+    compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: '9.0.37'
+
 
     providedCompile group: 'javax.servlet', name: 'javax.servlet-api', version: '4.0.1'
 
