@@ -1,0 +1,25 @@
+plugins {
+    id 'java'
+}
+
+group 'org.springframework'
+version '5.2.8.BUILD-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile(project(":spring-webmvc"))
+
+    compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-core', version: '8.5.5'
+    compile group: 'org.apache.tomcat.embed', name: 'tomcat-embed-jasper', version: '8.5.5'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
+    compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+
+
+
+
+    compileOnly group: 'javax.servlet', name: 'javax.servlet-api', version: '3.1.0'
+
+}

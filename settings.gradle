@@ -38,4 +38,5 @@ rootProject.children.each {project ->
 }
 include 'learning-spring-framework'
 include 'learning-spring-webmvc'
+include 'learning-mvc'
 
