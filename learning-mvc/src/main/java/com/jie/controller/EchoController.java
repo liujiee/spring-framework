@@ -12,4 +12,9 @@ public class EchoController {
 	public String echo(String echo) {
 		return echo;
 	}
+
+	@GetMapping("/hello")
+	public String echo() {
+		return "echo";
+	}
 }
