@@ -16,19 +16,18 @@
 
 package org.springframework.aop.aspectj.annotation;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.aspectj.lang.reflect.PerClauseKind;
-
 import org.springframework.aop.Advisor;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Helper for retrieving @AspectJ beans from a BeanFactory and building
@@ -74,6 +73,15 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 
 
 	/**
+	 *
+	 * 1. 获取所有 BeanName, 所有在 beanFactory 中注册的 bean 都会被提取出来
+	 * 2. 遍历所有 BeanName， 并找到声明 AspectJ 注解的类，进行进一步处理
+	 * 3. 对标记为 AspectJ 注解的类进行增强器的提取
+	 * 		(委托給org.springframework.aop.aspectj.annotation.AspectJAdvisorFactory#getAdvisors
+	 * 				(org.springframework.aop.aspectj.annotation.MetadataAwareAspectInstanceFactory))
+	 * 4. 將提取结果加入到缓存中
+	 *
+	 *
 	 * Look for AspectJ-annotated aspect beans in the current bean factory,
 	 * and return to a list of Spring AOP Advisors representing them.
 	 * <p>Creates a Spring Advisor for each AspectJ advice method.
@@ -97,6 +105,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 						}
 						// We must be careful not to instantiate beans eagerly as in this case they
 						// would be cached by the Spring container but would not have been weaved.
+						// 我们必须注意不要急于实例化bean，因为在这种情况下，它们将由Spring容器缓存，但不会被织入
 						Class<?> beanType = this.beanFactory.getType(beanName);
 						if (beanType == null) {
 							continue;

@@ -125,6 +125,17 @@ public @interface EnableAspectJAutoProxy {
 	/**
 	 * Indicate whether subclass-based (CGLIB) proxies are to be created as opposed
 	 * to standard Java interface-based proxies. The default is {@code false}.
+	 *
+	 *
+	 * Spring AOP 部分使用 JDK 动态代理或者 CGLIB 來为目标对象创建代理（建议尽量使用 JDK 动态代理）
+	 * 如果目标对象实现了至少一个接口，则会使用 JDK 动态代理，所有改目标类型实现的接口都將被代理
+	 * 如果目标对象没有实现任何接口，则会创建一个 CGLIB 代理
+	 *
+	 * 如果希望强制使用 CGLIB （比如希望代理目标对象的所有方法，而不是只实现接口的方法）
+	 * proxyTargetClass = true，但是需要考虑一下两个问题
+	 * 1. 无法通知 advise Final 方法， 因为它们不能被覆盖
+	 * 2. 需要將 CGLIB 依赖加入到 classpath 中
+	 *
 	 */
 	boolean proxyTargetClass() default false;
 
@@ -133,6 +144,24 @@ public @interface EnableAspectJAutoProxy {
 	 * for retrieval via the {@link org.springframework.aop.framework.AopContext} class.
 	 * Off by default, i.e. no guarantees that {@code AopContext} access will work.
 	 * @since 4.3.1
+	 *
+	 * 有时候目标对象内部的自我调用无法实施切面中的增强， eg
+	 * public interface AService {
+	 * 		public void a ( ) ;
+	 * 		public vOid b () ;
+	 * }
+	 * @Service
+	 * public class AServiceimpll implements AService{
+	 * 		@Transactional (propagation = Propagation . REQUIRED)
+	 * 		public void a () {
+	 * 			this.b() ;
+	 * 		}
+	 * 		@Transactional (propagation = Propaga t 工on . REQUIRES_NEW)
+	 * 		public void b () {
+	 * 		}
+	 * }
+	 *  只需要將 exposeProxy = true & this.b 修改为 ((AService)AopContext.currentProxy()).b()即可
+	 *
 	 */
 	boolean exposeProxy() default false;
 
