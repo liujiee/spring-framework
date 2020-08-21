@@ -15,7 +15,6 @@ public class UserAspectJ {
 	 */
 	@Pointcut("execution(* add(..))")
 	public void test() {
-
 	}
 
 
