@@ -1,5 +1,8 @@
 package com.jie.proxy.jdk;
 
+import com.jie.service.UserService;
+import com.jie.service.UserServiceImpl;
+
 public class Test {
 
 	public static void main(String[] args) {

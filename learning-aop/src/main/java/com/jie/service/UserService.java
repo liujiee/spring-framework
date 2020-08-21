@@ -1,4 +1,4 @@
-package com.jie.proxy.jdk;
+package com.jie.service;
 
 public interface UserService {
 

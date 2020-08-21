@@ -1,10 +1,9 @@
 package com.jie.entity;
 
-import com.jie.proxy.jdk.Test;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TestBean implements TestBeanInterface {
+public class TestBean {
 	private String testStr = "testStr";
 
 	public String getTestStr() {
