@@ -94,9 +94,8 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 		 * 这个方法也不干实事，就做了一件事情，
 		 * 	如果bean是单例的，就必须保证全局唯一。也没必要重复创建，缓存起来提高利用率
 		 * 然后把真正的事情委托給 doGetObjectFromFactoryBean
-		 *
 		 */
-
+		// 如果是单例 && singletonObjects 中已经存在
 		if (factory.isSingleton() && containsSingleton(beanName)) {
 			synchronized (getSingletonMutex()) {
 				Object object = this.factoryBeanObjectCache.get(beanName);
@@ -116,7 +115,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 							}
 							beforeSingletonCreation(beanName);
 							try {
-								// 调用 ObjectFactory 的后置处理器
+								// 调用后置处理器 BeanPostProcessor.postProcessAfterInitialization
 								object = postProcessObjectFromFactoryBean(object, beanName);
 							}
 							catch (Throwable ex) {

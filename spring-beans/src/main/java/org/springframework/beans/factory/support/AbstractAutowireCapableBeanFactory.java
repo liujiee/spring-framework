@@ -441,13 +441,18 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		// Make sure bean class is actually resolved at this point, and
 		// clone the bean definition in case of a dynamically resolved Class
 		// which cannot be stored in the shared merged bean definition.
+		// 锁定 class， 根据设定的 class 属性或者依据 className 來解析 Class
 		Class<?> resolvedClass = resolveBeanClass(mbd, beanName);
 		if (resolvedClass != null && !mbd.hasBeanClass() && mbd.getBeanClassName() != null) {
 			mbdToUse = new RootBeanDefinition(mbd);
 			mbdToUse.setBeanClass(resolvedClass);
 		}
 
-		// Prepare method overrides.
+		/**
+		 * Prepare method overrides.
+		 * 验证准备覆盖的方法
+		 * prepareMethodOverrides 主要处理 lookup-method & replace-method
+		 */
 		try {
 			mbdToUse.prepareMethodOverrides();
 		}
@@ -460,10 +465,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			// Give BeanPostProcessors a chance to return a proxy instead of the target bean instance.
 			// 给 BeanPostProcessor 一个机会來返回代理类來代替真正的实例
 			/**
-			 * 1. 第一次调用后置处理器 执行 InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation
+			 * 1. 调用后置处理器: 第一次 解析指定 bean 是否存在初始化前的短路操作
+			 *  执行 InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation
 			 * 	如果返回了对象，则跳过所有的流程，直接执行BeanPostProcessor#postProcessAfterInitialization 返回 bean 即可
-			 *
-			 *
 			 */
 			Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 			if (bean != null) {
@@ -476,6 +480,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		}
 
 		try {
+			// 真正干活的方法 doCreateBean
 			Object beanInstance = doCreateBean(beanName, mbdToUse, args);
 			if (logger.isTraceEnabled()) {
 				logger.trace("Finished creating instance of bean '" + beanName + "'");
@@ -512,12 +517,19 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		// Instantiate the bean.
 		BeanWrapper instanceWrapper = null;
+		// 如果是单例 bean 首先要清楚缓存 ？？？
 		if (mbd.isSingleton()) {
 			instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
 		}
 		if (instanceWrapper == null) {
-			// 根据指定Bean使用的策略创建新的实例，如工厂方法，构造函数自动注入、简单初始化等
-			// 第二次调用 BeanPostProcessor, 囘调
+			/**
+			 * 根据指定Bean使用的策略创建新的实例，如工厂方法，构造函数自动注入、简单初始化等
+			 * 第二次调用 BeanPostProcessor, 囘调
+			 * 將 BD 转化成 BeanWrapper, 过程如下
+			 * 1. 如果存在工厂方法，则使用工厂方法进行初始化
+			 * 2. 一个类如果有多个构造函数，每个构造函数都有不同的参数，所以需要根据参数锁定构造函数并进行初始化
+			 * 3. 如果既不存在工厂方法也不存在带有参数的构造函数，则使用默认的构造函数进行 bean的实例化
+			 */
 			instanceWrapper = createBeanInstance(beanName, mbd, args);
 		}
 		Object bean = instanceWrapper.getWrappedInstance();
@@ -530,7 +542,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		synchronized (mbd.postProcessingLock) {
 			if (!mbd.postProcessed) {
 				try {
-					// 第二次调用 BeanPostProcessor, 回调MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
+					// 第三次调用 BeanPostProcessor, 回调MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
+					// Autowired 注解正是在回调中实现类型的预解析
 					applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
 				}
 				catch (Throwable ex) {
@@ -543,7 +556,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		// Eagerly cache singletons to be able to resolve circular references
 		// even when triggered by lifecycle interfaces like BeanFactoryAware.
-		// 是否需要提早曝光：单例&允许循环依赖&当前bean正在创建中，检测循环依赖
+		/**
+		 * 是否需要提早曝光：单例&允许循环依赖&当前bean正在创建中，检测循环依赖
+		 * 从源码中我们证实可以通过修改 allowCircularReferences = false, 來禁用循环依赖
+ 		 */
 		boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
 				isSingletonCurrentlyInCreation(beanName));
 		if (earlySingletonExposure) {
@@ -552,9 +568,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 						"' to allow for resolving potential circular references");
 			}
 			// 为避免后期循环依赖，可以在bean初始化完成前將创建实例的ObjectFactory加入工厂
-			// 对Bean再一次循环引用，主要应用SmartInstantiationAwareBeanPostProcessor, 其中我们熟知的 AOP 就是在这里动态织入到 bean 中
+			// 对Bean再一次循环引用，主要应用SmartInstantiationAwareBeanPostProcessor, AOP的织入发生在回调函数中
 			// 若没有则直接返回bean，不做任何处理
-			// 第三次调用 BeanPostPorcessor, 囘调 MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition#getEarlyBeanReference
+			// 第三次调用 BeanPostProcessor, 囘调 MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition#getEarlyBeanReference
 			addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
 		}
 
