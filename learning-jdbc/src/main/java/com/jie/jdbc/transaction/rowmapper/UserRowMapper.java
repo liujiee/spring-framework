@@ -1,4 +1,4 @@
-package com.jie.jdbc.rowmapper;
+package com.jie.jdbc.transaction.rowmapper;
 
 import com.jie.jdbc.entity.User;
 import org.springframework.jdbc.core.RowMapper;

@@ -1,4 +1,4 @@
-package com.jie.jdbc.service;
+package com.jie.jdbc.transaction.service;
 
 import com.jie.jdbc.entity.User;
 import org.springframework.transaction.annotation.Propagation;

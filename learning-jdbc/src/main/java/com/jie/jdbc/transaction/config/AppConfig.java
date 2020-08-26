@@ -1,4 +1,4 @@
-package com.jie.jdbc.config;
+package com.jie.jdbc.transaction.config;
 
 import org.postgresql.Driver;
 import org.springframework.context.annotation.Bean;
