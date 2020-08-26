@@ -30,4 +30,9 @@ public class AppConfig {
 	public MapA mapA() {
 		return new MapA();
 	}
+
+	@Bean
+	public ArrayA arrayA() {
+		return new ArrayA();
+	}
 }
