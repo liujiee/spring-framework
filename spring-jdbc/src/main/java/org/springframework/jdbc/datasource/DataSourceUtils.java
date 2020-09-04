@@ -16,21 +16,19 @@
 
 package org.springframework.jdbc.datasource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
-
-import javax.sql.DataSource;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.Assert;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * Helper class that provides static methods for obtaining JDBC Connections from
@@ -99,9 +97,20 @@ public abstract class DataSourceUtils {
 	 * @see #doReleaseConnection
 	 */
 	public static Connection doGetConnection(DataSource dataSource) throws SQLException {
+		/**
+		 * If an existing transaction already has a connection synchronized (linked) to it,
+		 * that instance is returned. Otherwise, the method call triggers the creation of a
+		 * new connection, which is (optionally) synchronized to any existing transaction
+		 * and made available for subsequent reuse in that same transaction
+		 */
+
+		/**
+		 * 获取连接的时候，Spring 主要考虑了关于事务方面的处理。需要保证线程中的数据库操作都是使用同一个事务连接
+		 */
 		Assert.notNull(dataSource, "No DataSource specified");
 
 		ConnectionHolder conHolder = (ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource);
+		// 此分支相当于直接调用 dataSource.getConnection()
 		if (conHolder != null && (conHolder.hasConnection() || conHolder.isSynchronizedWithTransaction())) {
 			conHolder.requested();
 			if (!conHolder.hasConnection()) {
@@ -126,6 +135,7 @@ public abstract class DataSourceUtils {
 				else {
 					holderToUse.setConnection(con);
 				}
+				// 记录数据库连接
 				holderToUse.requested();
 				TransactionSynchronizationManager.registerSynchronization(
 						new ConnectionSynchronization(holderToUse, dataSource));

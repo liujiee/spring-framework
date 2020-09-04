@@ -16,27 +16,6 @@
 
 package org.springframework.jdbc.core;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.sql.BatchUpdateException;
-import java.sql.CallableStatement;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLWarning;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.sql.DataSource;
-
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.dao.support.DataAccessUtils;
@@ -52,6 +31,14 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.LinkedCaseInsensitiveMap;
 import org.springframework.util.StringUtils;
+
+import javax.sql.DataSource;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.*;
+import java.util.*;
 
 /**
  * <b>This is the central class in the JDBC core package.</b>
@@ -601,6 +588,9 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 	@Nullable
 	public <T> T execute(PreparedStatementCreator psc, PreparedStatementCallback<T> action)
 			throws DataAccessException {
+		/**
+		 * execute 方法是最基础的操作，依据不同类型的 PreparedStatementCallback 來执行 query、update 之类的操作
+		 */
 
 		Assert.notNull(psc, "PreparedStatementCreator must not be null");
 		Assert.notNull(action, "Callback object must not be null");
@@ -609,11 +599,15 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 			logger.debug("Executing prepared SQL statement" + (sql != null ? " [" + sql + "]" : ""));
 		}
 
+		// 为什么不直接调用 dataSource.getConnection() ??? 当然是要考虑事务的处理啦
 		Connection con = DataSourceUtils.getConnection(obtainDataSource());
 		PreparedStatement ps = null;
 		try {
 			ps = psc.createPreparedStatement(con);
+			// 应用用户设定的输入参数
 			applyStatementSettings(ps);
+			// 调用回调函数
+			// 处理一些通用方法外的个性化处理，也就是 PreparedStatementCallback 类型的 doInPreparedStatement 方法的回调
 			T result = action.doInPreparedStatement(ps);
 			handleWarnings(ps);
 			return result;
@@ -621,6 +615,7 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 		catch (SQLException ex) {
 			// Release Connection early, to avoid potential connection pool deadlock
 			// in the case when the exception translator hasn't been initialized yet.
+			// 释放数据库连接避免当异常转化器没有被初始化的时候出现潜在的连接池死锁
 			if (psc instanceof ParameterDisposer) {
 				((ParameterDisposer) psc).cleanupParameters();
 			}
@@ -628,6 +623,8 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 			psc = null;
 			JdbcUtils.closeStatement(ps);
 			ps = null;
+			// 没有调用 conn.close(), 同样也是考虑到事务的情况，如果当前线程存在事务，那么说明在当前线程中存在共用数据库连接。
+			// 这种情况下直接使用 ConnectionHolder 中的 release 方法进行连接数减一， 而不是真正的释放连接
 			DataSourceUtils.releaseConnection(con, getDataSource());
 			con = null;
 			throw translateException("PreparedStatementCallback", sql, ex);
@@ -862,6 +859,17 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 		return updateCount(execute(psc, ps -> {
 			try {
 				if (pss != null) {
+					// 设置 PrepareStatement 所需要的全部参数
+					/**
+					 * 使用 spring-jdbc 参数是这样传递的
+					 * 	jdbcTemplate.update("insert into \"user\"(name, age, sex) values (?, ?, ?)",
+					 * 				new Object[]{user.getName(), user.getAge(), user.getSex()});
+					 * 使用 jdbc 参数是这样传递的
+					 * PreparedStatement update = conn.prepareStatement("insert into user(name, age, sex) values (?,?,?)
+					 * update.setString(1, user.getUserName());
+					 * update.setInt(2, user.getAge());
+					 * update.setString(3,user.getSex());
+					 */
 					pss.setValues(ps);
 				}
 				int rows = ps.executeUpdate();
@@ -1361,10 +1369,20 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 	 * @see org.springframework.jdbc.datasource.DataSourceUtils#applyTransactionTimeout
 	 */
 	protected void applyStatementSettings(Statement stmt) throws SQLException {
+		/**
+		 * fetchSize 最主要是为了减少网络交互次数设计的。放访问 ResultSet 时， 如果每次只从服务器上读取一行数据，则会产生大量开销。
+		 *
+		 * setFetchSize 意味着当调用 rs.next 时, ResultSet 会一次性从服务器上取多少行数据回来，这样在下次 rs.next 时，可以直接
+		 * 从内存中获取数据而不需要网络交互，提高了效率。
+		 *
+		 * 这个设置可能被某些 JDBC 驱动忽略，而且设置过大也会造成内存浪费
+		 *
+		 */
 		int fetchSize = getFetchSize();
 		if (fetchSize != -1) {
 			stmt.setFetchSize(fetchSize);
 		}
+		// 限制 ResultSet 对象可以包含的最大行数
 		int maxRows = getMaxRows();
 		if (maxRows != -1) {
 			stmt.setMaxRows(maxRows);
@@ -1403,8 +1421,10 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 	 * @see org.springframework.jdbc.SQLWarningException
 	 */
 	protected void handleWarnings(Statement stmt) throws SQLException {
+		// 当设置为忽略警告时只尝试打印日志
 		if (isIgnoreWarnings()) {
 			if (logger.isDebugEnabled()) {
+				// 如果日志开启的情况下打印日志
 				SQLWarning warningToLog = stmt.getWarnings();
 				while (warningToLog != null) {
 					logger.debug("SQLWarning ignored: SQL state '" + warningToLog.getSQLState() + "', error code '" +
@@ -1414,6 +1434,7 @@ public class JdbcTemplate extends JdbcAccessor implements JdbcOperations {
 			}
 		}
 		else {
+			// 没有设置忽略警告的话， 包装成 SQLWarningException 抛出
 			handleWarnings(stmt.getWarnings());
 		}
 	}

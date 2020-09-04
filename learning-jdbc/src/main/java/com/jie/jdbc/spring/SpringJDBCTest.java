@@ -29,9 +29,18 @@ public class SpringJDBCTest {
 		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
 
 		UserService userService = (UserService) context.getBean("userService");
+		testQuery(userService);
+//		testSave(userService);
+	}
 
-		for (User user : userService.getUsers()) {
-			System.out.println(user);
-		}
+	static void testSave(UserService userService) {
+		assert userService != null;
+		User user = new User("test123", 12, "male");
+		userService.save(user);
+	}
+
+	static void testQuery(UserService userService) {
+		assert userService != null;
+		System.out.println(userService.getUsers());
 	}
 }
